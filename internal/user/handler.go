@@ -1,6 +1,7 @@
 package user
 
 import (
+	"app-server/internal/pkg/app"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -16,36 +17,34 @@ func NewHandler(s Service) *Handler {
 
 func (h *Handler) Register(c *gin.Context) {
 	var req RegisterRequest
-
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "参数格式不正确"})
+		// 哪怕是参数不对，我们也统一返回 CodeServerErr (500)
+		app.Error(c, http.StatusBadRequest, app.CodeServerErr, "参数格式不正确")
 		return
 	}
 
 	err := h.svc.Register(c.Request.Context(), &req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		app.Error(c, http.StatusInternalServerError, app.CodeServerErr, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "注册成功"})
+	app.Success(c, nil)
 }
 
 func (h *Handler) Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "参数格式不正确"})
+		app.Error(c, http.StatusBadRequest, app.CodeServerErr, "参数格式不正确")
 		return
 	}
 
 	user, err := h.svc.Login(c.Request.Context(), req.Account, req.Password)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "账号或密码错误"})
+		// 这里的业务码也改用常量 CodeServerErr
+		app.Error(c, http.StatusUnauthorized, app.CodeServerErr, "账号或密码错误")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "登录成功",
-		"data":    user,
-	})
+	app.Success(c, user)
 }
