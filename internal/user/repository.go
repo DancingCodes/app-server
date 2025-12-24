@@ -1,25 +1,19 @@
 package user
 
-// Repository 定义了用户模块对数据库的操作规范
+import (
+	"context"
+)
+
 type Repository interface {
-	Create(u *User) error
-	GetByID(id int64) (*User, error)
-}
+	// Create 插入一条新用户记录
+	Create(ctx context.Context, user *User) error
 
-// 具体的实现类（比如 MySQL 实现）
-type mysqlRepo struct {
-	// db *sql.DB 或者 gorm.DB
-}
+	// GetByAccount 根据账号查找用户
+	GetByAccount(ctx context.Context, account string) (*User, error)
 
-func NewUserRepository() Repository {
-	return &mysqlRepo{}
-}
+	// GetByID 根据 ID 查找用户
+	GetByID(ctx context.Context, id uint) (*User, error)
 
-func (m *mysqlRepo) Create(u *User) error {
-	// 这里写具体的 SQL 操作
-	return nil
-}
-
-func (m *mysqlRepo) GetByID(id int64) (*User, error) {
-	return &User{ID: id, Username: "test"}, nil
+	// Update 更新用户信息
+	Update(ctx context.Context, user *User) error
 }
