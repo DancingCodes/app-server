@@ -19,9 +19,9 @@ func (User) TableName() string {
 
 // RegisterRequest 专门用于注册接口，接收前端传来的 JSON
 type RegisterRequest struct {
+	Nickname string `json:"nickname" binding:"required"`
 	Account  string `json:"account" binding:"required"`
 	Password string `json:"password" binding:"required"`
-	Nickname string `json:"nickname"` // 昵称可以选填
 }
 
 // LoginRequest 专门用于登录接口
