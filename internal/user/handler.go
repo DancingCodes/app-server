@@ -48,21 +48,22 @@ func (h *Handler) Login(c *gin.Context) {
 		return
 	}
 
-	// 1. 调用 Service 登录
+	// 调用 Service
 	user, err := h.svc.Login(c.Request.Context(), req.Account, req.Password)
-	if err != nil {
-		app.Error(c, http.StatusUnauthorized, app.CodeAuthErr, "账号或密码错误")
+
+	// 这里的 user == nil 判断非常重要
+	// 即使 Service 没写好，Handler 这里也能兜底防止 app.GenerateToken(user.ID) 崩溃
+	if err != nil || user == nil {
+		app.Error(c, http.StatusUnauthorized, app.CodeServerErr, "账号或密码错误")
 		return
 	}
 
-	// 2. 生成 Token
 	token, err := app.GenerateToken(user.ID)
 	if err != nil {
 		app.Error(c, http.StatusInternalServerError, app.CodeServerErr, "生成令牌失败")
 		return
 	}
 
-	// 3. 移除 user 对象，仅返回 token
 	app.Success(c, gin.H{
 		"token": token,
 	})
@@ -70,25 +71,26 @@ func (h *Handler) Login(c *gin.Context) {
 
 // GetProfile 获取当前登录用户的个人资料
 func (h *Handler) GetProfile(c *gin.Context) {
-	// 1. 从 Context 中取出中间件设置的 userID
-	// 注意：middleware.Auth 里的 c.Set("userID", claims.UserID) 存的是什么类型，这里就要转成什么类型
+	// 1. 从 Context 中取出中间件已经设置好的 userID
+	// 这个值是 middleware.Auth 校验 Token 成功后存进去的
 	uid, exists := c.Get("userID")
 	if !exists {
-		app.Error(c, http.StatusUnauthorized, app.CodeAuthErr, "未登录或登录已过期")
+		app.Error(c, http.StatusUnauthorized, app.CodeAuthErr, "身份验证失败")
 		return
 	}
 
-	// 2. 类型断言 (将 interface{} 转回 uint)
-	userID, ok := uid.(uint)
-	if !ok {
-		app.Error(c, http.StatusInternalServerError, app.CodeServerErr, "内部系统错误")
+	// 2. 类型断言
+	userID := uid.(uint)
+
+	// 3. 直接用这个 ID 去数据库查，不需要前端传任何 ID 参数
+	user, err := h.svc.GetByID(c.Request.Context(), userID)
+	if err != nil {
+		app.Error(c, http.StatusNotFound, app.CodeServerErr, "用户不存在")
 		return
 	}
 
-	// 3. 模拟获取用户信息 (实际开发中你会调用 h.svc.GetUserByID)
-	// 这里我们先直接返回 userID 证明 JWT 校验成功
+	// 4. 返回完整的用户信息
 	app.Success(c, gin.H{
-		"user_id": userID,
-		"remark":  "恭喜，你能看到这个信息说明你的 JWT 校验成功了！",
+		"user": user,
 	})
 }

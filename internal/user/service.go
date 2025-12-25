@@ -11,6 +11,7 @@ import (
 type Service interface {
 	Register(ctx context.Context, req *RegisterRequest) (*User, error)
 	Login(ctx context.Context, account string, password string) (*User, error)
+	GetByID(ctx context.Context, id uint) (*User, error)
 }
 
 type ServiceImpl struct {
@@ -53,18 +54,30 @@ func (s *ServiceImpl) Register(ctx context.Context, req *RegisterRequest) (*User
 // ... Login 实现保持不变
 
 func (s *ServiceImpl) Login(ctx context.Context, account, password string) (*User, error) {
-	// 1. 先根据账号找到这个用户
+	// 1. 查询用户
 	user, err := s.repo.GetByAccount(ctx, account)
-	if err != nil {
-		return nil, errors.New("账号或密码错误") // 统一报错，不告诉前端是账号没找到还是密码错了，更安全
+
+	// --- 核心修复点 ---
+	// 手动删除数据后，GetByAccount 可能会返回 (nil, nil) 或 (nil, err)
+	// 我们必须在这里拦截，不能让程序往下走到 bcrypt 那一行
+	if err != nil || user == nil {
+		return nil, errors.New("账号不存在")
 	}
 
-	// 2. 使用 Bcrypt 工具比对【数据库里的密文】和【用户输入的明文】
-	// 成功返回 nil，失败返回 error
+	// 2. 只有 user != nil，访问 user.Password 才是安全的
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
 	if err != nil {
-		return nil, errors.New("账号或密码错误")
+		return nil, errors.New("密码错误")
 	}
 
+	return user, nil
+}
+
+func (s *ServiceImpl) GetByID(ctx context.Context, id uint) (*User, error) {
+	// 调用 repository 层的查询方法
+	user, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
 	return user, nil
 }
