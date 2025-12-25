@@ -44,7 +44,7 @@ func (h *Handler) Register(c *gin.Context) {
 func (h *Handler) Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		app.Error(c, http.StatusBadRequest, app.CodeServerErr, "参数格式不正确")
+		app.Error(c, http.StatusInternalServerError, app.CodeServerErr, "参数格式不正确")
 		return
 	}
 
@@ -54,7 +54,7 @@ func (h *Handler) Login(c *gin.Context) {
 	// 这里的 user == nil 判断非常重要
 	// 即使 Service 没写好，Handler 这里也能兜底防止 app.GenerateToken(user.ID) 崩溃
 	if err != nil || user == nil {
-		app.Error(c, http.StatusUnauthorized, app.CodeServerErr, "账号或密码错误")
+		app.Error(c, http.StatusInternalServerError, app.CodeServerErr, "账号或密码错误")
 		return
 	}
 
@@ -71,21 +71,24 @@ func (h *Handler) Login(c *gin.Context) {
 
 // GetProfile 获取当前登录用户的个人资料
 func (h *Handler) GetProfile(c *gin.Context) {
-	// 1. 从 Context 中取出中间件已经设置好的 userID
-	// 这个值是 middleware.Auth 校验 Token 成功后存进去的
+	// 1. 获取 userID
 	uid, exists := c.Get("userID")
 	if !exists {
-		app.Error(c, http.StatusUnauthorized, app.CodeAuthErr, "身份验证失败")
+		app.Error(c, http.StatusInternalServerError, app.CodeAuthErr, "身份验证失败")
 		return
 	}
 
 	// 2. 类型断言
 	userID := uid.(uint)
 
-	// 3. 直接用这个 ID 去数据库查，不需要前端传任何 ID 参数
+	// 3. 获取用户信息
 	user, err := h.svc.GetByID(c.Request.Context(), userID)
-	if err != nil {
-		app.Error(c, http.StatusNotFound, app.CodeServerErr, "用户不存在")
+
+	// 🔥 关键修改：在这里同时判断 err 和 user 是否为空
+	// 如果数据库没查到，即使 err 是 nil，但 user 为空，我们也认为验证/查询失败
+	if err != nil || user == nil {
+		// 如果你想返回 401（未授权/身份失效）
+		app.Error(c, http.StatusInternalServerError, app.CodeAuthErr, "用户不存在或登录已失效")
 		return
 	}
 

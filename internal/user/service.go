@@ -37,6 +37,7 @@ func (s *ServiceImpl) Register(ctx context.Context, req *RegisterRequest) (*User
 
 	// 3. 构造用户对象
 	user := &User{
+		Nickname: req.Nickname,
 		Account:  req.Account,
 		Password: string(hashedPassword),
 	}
