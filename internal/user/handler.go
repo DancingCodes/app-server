@@ -14,51 +14,57 @@ type Handler struct {
 func NewHandler(s Service) *Handler {
 	return &Handler{svc: s}
 }
-
 func (h *Handler) Register(c *gin.Context) {
 	var req RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		// 哪怕是参数不对，我们也统一返回 CodeServerErr (500)
 		app.Error(c, http.StatusBadRequest, app.CodeServerErr, "参数格式不正确")
 		return
 	}
 
-	err := h.svc.Register(c.Request.Context(), &req)
+	// 1. 调用 Service 注册
+	user, err := h.svc.Register(c.Request.Context(), &req)
 	if err != nil {
 		app.Error(c, http.StatusInternalServerError, app.CodeServerErr, err.Error())
 		return
 	}
 
-	app.Success(c, nil)
-}
-
-func (h *Handler) Login(c *gin.Context) {
-	// 1. 声明 req 变量（这一步不能漏！）
-	var req LoginRequest
-
-	// 2. 绑定参数：将请求体中的 JSON 映射到 req 结构体
-	if err := c.ShouldBindJSON(&req); err != nil {
-		app.Error(c, http.StatusBadRequest, app.CodeServerErr, "参数格式不正确")
-		return
-	}
-
-	// 3. 现在 req.Account 和 req.Password 就可以安全使用了
-	user, err := h.svc.Login(c.Request.Context(), req.Account, req.Password)
-	if err != nil {
-		app.Error(c, http.StatusUnauthorized, app.CodeAuthErr, "账号或密码错误")
-		return
-	}
-
-	// 4. 生成 Token 并返回（如之前所述）
+	// 2. 注册成功生成 Token
 	token, err := app.GenerateToken(user.ID)
 	if err != nil {
 		app.Error(c, http.StatusInternalServerError, app.CodeServerErr, "生成令牌失败")
 		return
 	}
 
+	// 3. 移除 user 对象，仅返回 token
 	app.Success(c, gin.H{
 		"token": token,
-		"user":  user,
+	})
+}
+
+func (h *Handler) Login(c *gin.Context) {
+	var req LoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		app.Error(c, http.StatusBadRequest, app.CodeServerErr, "参数格式不正确")
+		return
+	}
+
+	// 1. 调用 Service 登录
+	user, err := h.svc.Login(c.Request.Context(), req.Account, req.Password)
+	if err != nil {
+		app.Error(c, http.StatusUnauthorized, app.CodeAuthErr, "账号或密码错误")
+		return
+	}
+
+	// 2. 生成 Token
+	token, err := app.GenerateToken(user.ID)
+	if err != nil {
+		app.Error(c, http.StatusInternalServerError, app.CodeServerErr, "生成令牌失败")
+		return
+	}
+
+	// 3. 移除 user 对象，仅返回 token
+	app.Success(c, gin.H{
+		"token": token,
 	})
 }
 
