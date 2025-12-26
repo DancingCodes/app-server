@@ -94,15 +94,6 @@ func (s *ServiceImpl) UpdateProfile(ctx context.Context, userID uint, req *Updat
 		return errors.New("用户不存在")
 	}
 
-	// 2. 处理账号修改 (Account) - 需要查重
-	if req.Account != "" && req.Account != user.Account {
-		existUser, _ := s.repo.GetByAccount(ctx, req.Account)
-		if existUser != nil && existUser.ID != 0 {
-			return errors.New("该账号已被他人占用")
-		}
-		user.Account = req.Account
-	}
-
 	// 3. 处理密码修改 (Password) - 需要重新加密
 	if req.Password != "" {
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)

@@ -31,9 +31,8 @@ type LoginRequest struct {
 }
 
 type UpdateProfileRequest struct {
-	Account   string `json:"account"`   // 账号
-	Password  string `json:"password"`  // 密码
-	Nickname  string `json:"nickname"`  // 昵称
-	Avatar    string `json:"avatar"`    // 头像
-	Signature string `json:"signature"` // 签名
+	Password  string `json:"password"`
+	Nickname  string `json:"nickname"`
+	Avatar    string `json:"avatar"`
+	Signature string `json:"signature"`
 }

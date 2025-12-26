@@ -31,7 +31,7 @@ func Logger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// ANSI 颜色转义字符
 		const (
-			blue   = "\033[97;44m" // 蓝色背景 (200 OK)
+			blue   = "\033[97;44m" // 蓝色背景 (200 成功)
 			yellow = "\033[90;43m" // 黄色背景 (401 警告)
 			red    = "\033[97;41m" // 红色背景 (500 错误)
 			reset  = "\033[0m"     // 重置颜色
@@ -46,7 +46,7 @@ func Logger() gin.HandlerFunc {
 			c.Request.Body = io.NopCloser(bytes.NewBuffer(requestBody))
 		}
 
-		// 2. 包装 ResponseWriter
+		// 2. 包装 ResponseWriter 以捕获响应内容
 		writer := responseBodyWriter{
 			body:           bytes.NewBuffer(nil),
 			ResponseWriter: c.Writer,
@@ -55,15 +55,15 @@ func Logger() gin.HandlerFunc {
 
 		c.Next()
 
-		// 3. 结束后计算耗时
-		latencyTime := time.Since(startTime)
+		// 3. 计算耗时并转换为毫秒 (ms)
+		// 使用 Duration 的 Milliseconds 方法或浮点数计算以保留小数
+		latency := float64(time.Since(startTime).Microseconds()) / 1000.0
 
 		// 4. 解析业务 Code 决定颜色
 		var statusColor = reset
 		respBytes := writer.body.Bytes()
 		var biz bizResponse
 
-		// 尝试解析响应体
 		if len(respBytes) > 0 {
 			if err := json.Unmarshal(respBytes, &biz); err == nil {
 				switch biz.Code {
@@ -79,15 +79,15 @@ func Logger() gin.HandlerFunc {
 			}
 		}
 
-		// 5. 格式化打印日志
-		// 只有第一行带颜色背景，Params 和 Response 保持原色，清晰不累眼
-		log.Printf("\n%s [LOG] %s %s %s | IP: %s | Latency: %v\n"+
-			"  ├─ [Params]:   %s\n"+
-			"  └─ [Response]: %s\n"+
+		// 5. 格式化打印中文日志
+		// Latency 改为毫秒显示，标签全部中文化
+		log.Printf("\n%s [日志] %s %s %s | 来源IP: %s | 耗时: %.2f毫秒\n"+
+			"  ├─ [请求参数]: %s\n"+
+			"  └─ [返回结果]: %s\n"+
 			"----------------------------------------------------------------",
 			statusColor, c.Request.Method, c.Request.RequestURI, reset,
 			c.ClientIP(),
-			latencyTime,
+			latency,
 			string(requestBody),
 			string(respBytes),
 		)
