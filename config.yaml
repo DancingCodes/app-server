@@ -1,4 +1,4 @@
 database:
   dsn: "app_db:DancingCodes1227@tcp(82.156.9.114:3306)/app_db?charset=utf8mb4&parseTime=True&loc=Local"
 server:
-  port: ":8088"
+  port: ":3006"
