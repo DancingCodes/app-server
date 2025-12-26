@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"log"
 	"time"
@@ -9,30 +10,36 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// responseBodyWriter 包装了 gin.ResponseWriter，用于拦截返回内容
+// 用于解析响应中的业务代码
+type bizResponse struct {
+	Code int `json:"code"`
+}
+
 type responseBodyWriter struct {
 	gin.ResponseWriter
 	body *bytes.Buffer
 }
 
 func (w responseBodyWriter) Write(b []byte) (int, error) {
-	w.body.Write(b) // 将返回内容备份到 buffer
+	if b != nil {
+		w.body.Write(b)
+	}
 	return w.ResponseWriter.Write(b)
 }
 
 func Logger() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// 颜色代码定义
+		// ANSI 颜色转义字符
 		const (
-			green  = "\033[97;42m"
-			yellow = "\033[90;43m"
-			red    = "\033[97;41m"
-			reset  = "\033[0m"
+			blue   = "\033[97;44m" // 蓝色背景 (200 OK)
+			yellow = "\033[90;43m" // 黄色背景 (401 警告)
+			red    = "\033[97;41m" // 红色背景 (500 错误)
+			reset  = "\033[0m"     // 重置颜色
 		)
 
 		startTime := time.Now()
 
-		// 1. 处理请求参数
+		// 1. 备份请求参数
 		var requestBody []byte
 		if c.Request.Body != nil {
 			requestBody, _ = io.ReadAll(c.Request.Body)
@@ -40,37 +47,49 @@ func Logger() gin.HandlerFunc {
 		}
 
 		// 2. 包装 ResponseWriter
-		writer := &responseBodyWriter{body: bytes.NewBufferString(""), ResponseWriter: c.Writer}
+		writer := responseBodyWriter{
+			body:           bytes.NewBuffer(nil),
+			ResponseWriter: c.Writer,
+		}
 		c.Writer = writer
 
 		c.Next()
 
-		// 3. 计算结果
+		// 3. 结束后计算耗时
 		latencyTime := time.Since(startTime)
-		statusCode := c.Writer.Status()
 
-		// --- 动态选择颜色 ---
-		var statusColor string
-		switch {
-		case statusCode >= 200 && statusCode < 300:
-			statusColor = green
-		case statusCode >= 300 && statusCode < 400:
-			statusColor = yellow
-		default:
-			statusColor = red
+		// 4. 解析业务 Code 决定颜色
+		var statusColor = reset
+		respBytes := writer.body.Bytes()
+		var biz bizResponse
+
+		// 尝试解析响应体
+		if len(respBytes) > 0 {
+			if err := json.Unmarshal(respBytes, &biz); err == nil {
+				switch biz.Code {
+				case 200:
+					statusColor = blue
+				case 401:
+					statusColor = yellow
+				case 500:
+					statusColor = red
+				default:
+					statusColor = reset
+				}
+			}
 		}
 
-		// 4. 打印带颜色的日志
-		log.Printf("\n%s [Request] %s %s %s | IP: %s | Status: %d | Latency: %v\n"+
-			"[Params] %s\n"+
-			"[Response] %s\n"+
+		// 5. 格式化打印日志
+		// 只有第一行带颜色背景，Params 和 Response 保持原色，清晰不累眼
+		log.Printf("\n%s [LOG] %s %s %s | IP: %s | Latency: %v\n"+
+			"  ├─ [Params]:   %s\n"+
+			"  └─ [Response]: %s\n"+
 			"----------------------------------------------------------------",
 			statusColor, c.Request.Method, c.Request.RequestURI, reset,
 			c.ClientIP(),
-			statusCode,
 			latencyTime,
 			string(requestBody),
-			writer.body.String(),
+			string(respBytes),
 		)
 	}
 }

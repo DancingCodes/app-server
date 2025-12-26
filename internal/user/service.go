@@ -35,11 +35,14 @@ func (s *ServiceImpl) Register(ctx context.Context, req *RegisterRequest) (*User
 		return nil, err
 	}
 
+	defaultAvatar := "https://filestore.moonc.love/uploadFiles/1766716767733-395871637.png"
+
 	// 3. 构造用户对象
 	user := &User{
 		Nickname: req.Nickname,
 		Account:  req.Account,
 		Password: string(hashedPassword),
+		Avatar:   defaultAvatar,
 	}
 
 	// 4. 将用户存入数据库

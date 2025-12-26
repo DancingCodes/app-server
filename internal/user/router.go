@@ -7,7 +7,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func RegisterHandlers(r *gin.Engine, db *gorm.DB) {
+func Router(r *gin.Engine, db *gorm.DB) {
 	// 初始化依赖
 	repo := NewRepository(db)
 	svc := NewService(repo)
