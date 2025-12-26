@@ -97,3 +97,30 @@ func (h *Handler) GetProfile(c *gin.Context) {
 		"user": user,
 	})
 }
+
+// UpdateProfile 修改当前登录用户的资料
+func (h *Handler) UpdateProfile(c *gin.Context) {
+	// 1. 从 Context 获取 userID (Auth 中间件存入的)
+	uid, exists := c.Get("userID")
+	if !exists {
+		app.Error(c, http.StatusUnauthorized, app.CodeAuthErr, "身份验证失败")
+		return
+	}
+	userID := uid.(uint)
+
+	// 2. 绑定请求参数
+	var req UpdateProfileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		app.Error(c, http.StatusBadRequest, app.CodeServerErr, "参数格式不正确")
+		return
+	}
+
+	// 3. 调用 Service 执行更新
+	if err := h.svc.UpdateProfile(c.Request.Context(), userID, &req); err != nil {
+		app.Error(c, http.StatusInternalServerError, app.CodeServerErr, err.Error())
+		return
+	}
+
+	// 4. 返回成功
+	app.Success(c, "个人资料更新成功")
+}

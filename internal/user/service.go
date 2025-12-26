@@ -12,6 +12,7 @@ type Service interface {
 	Register(ctx context.Context, req *RegisterRequest) (*User, error)
 	Login(ctx context.Context, account string, password string) (*User, error)
 	GetByID(ctx context.Context, id uint) (*User, error)
+	UpdateProfile(ctx context.Context, userID uint, req *UpdateProfileRequest) error
 }
 
 type ServiceImpl struct {
@@ -84,4 +85,44 @@ func (s *ServiceImpl) GetByID(ctx context.Context, id uint) (*User, error) {
 		return nil, err
 	}
 	return user, nil
+}
+
+func (s *ServiceImpl) UpdateProfile(ctx context.Context, userID uint, req *UpdateProfileRequest) error {
+	// 1. 先从数据库查出老数据
+	user, err := s.repo.GetByID(ctx, userID)
+	if err != nil || user == nil {
+		return errors.New("用户不存在")
+	}
+
+	// 2. 处理账号修改 (Account) - 需要查重
+	if req.Account != "" && req.Account != user.Account {
+		existUser, _ := s.repo.GetByAccount(ctx, req.Account)
+		if existUser != nil && existUser.ID != 0 {
+			return errors.New("该账号已被他人占用")
+		}
+		user.Account = req.Account
+	}
+
+	// 3. 处理密码修改 (Password) - 需要重新加密
+	if req.Password != "" {
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+		if err != nil {
+			return err
+		}
+		user.Password = string(hashedPassword)
+	}
+
+	// 4. 处理其他基础字段 (只有前端传了值才覆盖)
+	if req.Nickname != "" {
+		user.Nickname = req.Nickname
+	}
+	if req.Avatar != "" {
+		user.Avatar = req.Avatar
+	}
+	if req.Signature != "" {
+		user.Signature = req.Signature
+	}
+
+	// 5. 调用 repository 的 Update 方法保存回数据库
+	return s.repo.Update(ctx, user)
 }

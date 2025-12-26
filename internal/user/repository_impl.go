@@ -46,6 +46,5 @@ func (r *mysqlRepository) GetByID(ctx context.Context, id uint) (*User, error) {
 }
 
 func (r *mysqlRepository) Update(ctx context.Context, u *User) error {
-	// Save 会更新所有字段，通常用于全量更新
 	return r.db.WithContext(ctx).Save(u).Error
 }

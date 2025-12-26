@@ -22,7 +22,10 @@ func Router(r *gin.Engine, db *gorm.DB) {
 	authGroup := r.Group("/u")
 	authGroup.Use(middleware.Auth())
 	{
-		// 这里的路径会自动变为 /u/profile
+		// 1. 获取个人资料 (GET)
 		authGroup.GET("/profile", h.GetProfile)
+
+		// 2. 修改个人资料 (POST)
+		authGroup.POST("/update", h.UpdateProfile)
 	}
 }
